@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块管理 - ZY_Cube</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #2c3e50;
+            color: white;
+        }
+        .back-link {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 800px;
+            max-height: 80%;
+            overflow: auto;
+        }
+        .close {
+            float: right;
+            cursor: pointer;
+            font-size: 20px;
+        }
+        .filter-bar {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .filter-bar select, .filter-bar button {
+            padding: 5px 10px;
+        }
+        .module-status {
+            font-size: 0.85rem;
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        .status-loaded {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-unloaded {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        /* 语言切换器样式 */
+        .lang-selector {
+            background: #34495e;
+            border: 1px solid #5d6e7e;
+            color: white;
+            padding: 5px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .lang-selector option {
+            background: #2c3e50;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        /* 退出按钮样式 - 与 dashboard 一致 */
+        .logout-btn {
+            background: #e74c3c;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <a href="/web/dashboard.html" class="back-link" data-i18n="back_link">← 返回工作台</a>
+            <span data-i18n="page_title">模块管理</span>
+        </div>
+        <div class="user-info">
+            <span id="username"></span>
+            <select id="langSwitcher" class="lang-selector">
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+            </select>
+            <button class="logout-btn" id="logout" data-i18n="logout_btn">退出</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h3 data-i18n="module_list_title">模块列表</h3>
+            <div class="filter-bar">
+                <label data-i18n="status_filter_label">状态筛选：</label>
+                <select id="statusFilter">
+                    <option value="all" data-i18n="filter_all">全部</option>
+                    <option value="loaded" data-i18n="filter_loaded">已加载</option>
+                    <option value="unloaded" data-i18n="filter_unloaded">未加载</option>
+                </select>
+                <button id="refreshBtn" class="btn btn-sm" data-i18n="refresh_btn">刷新</button>
+            </div>
+            <table id="modules-table">
+                <thead>
+                    <tr>
+                        <th data-i18n="th_id">模块ID</th>
+                        <th data-i18n="th_path">路径</th>
+                        <th data-i18n="th_api_prefix">API前缀</th>
+                        <th data-i18n="th_status">状态</th>
+                        <th data-i18n="th_actions">操作</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h3 data-i18n="load_module_title">加载新模块</h3>
+            <form id="load-form">
+                <div class="form-group">
+                    <label data-i18n="module_path_label">模块路径（绝对或相对）</label>
+                    <input type="text" id="module-path" class="form-control" placeholder="例如: ../mod/demo_module" required>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="module_id_label">模块ID（可选）</label>
+                    <input type="text" id="module-id" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="api_prefix_label">API前缀（可选）</label>
+                    <input type="text" id="api-prefix" class="form-control">
+                </div>
+                <button type="submit" class="btn btn-primary" data-i18n="load_btn">加载</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 查看 API 模态框 -->
+    <div id="api-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 data-i18n="api_modal_title">模块 API 详情</h3>
+            <pre id="api-detail" style="white-space: pre-wrap;"></pre>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 国际化资源 ====================
+        const i18n = {
+            zh: {
+                back_link: "← 返回工作台",
+                page_title: "模块管理",
+                logout_btn: "退出",
+                module_list_title: "模块列表",
+                status_filter_label: "状态筛选：",
+                filter_all: "全部",
+                filter_loaded: "已加载",
+                filter_unloaded: "未加载",
+                refresh_btn: "刷新",
+                th_id: "模块ID",
+                th_path: "路径",
+                th_api_prefix: "API前缀",
+                th_status: "状态",
+                th_actions: "操作",
+                load_module_title: "加载新模块",
+                module_path_label: "模块路径（绝对或相对）",
+                module_id_label: "模块ID（可选）",
+                api_prefix_label: "API前缀（可选）",
+                load_btn: "加载",
+                api_modal_title: "模块 API 详情",
+                // 操作按钮文本
+                unload_btn: "卸载",
+                reload_btn: "重载",
+                load_btn_short: "加载",
+                view_api_btn: "查看API",
+                // 提示信息
+                unload_confirm: "确定要卸载模块 {id} 吗？",
+                reload_confirm: "确定要重载模块 {id} 吗？",
+                load_confirm: "确定要加载模块 {id} 吗？",
+                unload_success: "卸载成功",
+                reload_success: "重载成功",
+                load_success: "模块加载成功",
+                unload_failed: "卸载失败：",
+                reload_failed: "重载失败：",
+                load_failed: "加载失败：",
+                get_api_failed: "获取 API 信息失败",
+                not_admin: "您不是管理员，无法管理模块",
+                unknown_error: "未知错误",
+                logout_confirm: "确定要退出登录吗？"
+            },
+            en: {
+                back_link: "← Back to Dashboard",
+                page_title: "Module Manager",
+                logout_btn: "Logout",
+                module_list_title: "Module List",
+                status_filter_label: "Status filter:",
+                filter_all: "All",
+                filter_loaded: "Loaded",
+                filter_unloaded: "Unloaded",
+                refresh_btn: "Refresh",
+                th_id: "Module ID",
+                th_path: "Path",
+                th_api_prefix: "API Prefix",
+                th_status: "Status",
+                th_actions: "Actions",
+                load_module_title: "Load New Module",
+                module_path_label: "Module Path (absolute or relative)",
+                module_id_label: "Module ID (optional)",
+                api_prefix_label: "API Prefix (optional)",
+                load_btn: "Load",
+                api_modal_title: "Module API Details",
+                unload_btn: "Unload",
+                reload_btn: "Reload",
+                load_btn_short: "Load",
+                view_api_btn: "View API",
+                unload_confirm: "Are you sure to unload module {id}?",
+                reload_confirm: "Are you sure to reload module {id}?",
+                load_confirm: "Are you sure to load module {id}?",
+                unload_success: "Unloaded successfully",
+                reload_success: "Reloaded successfully",
+                load_success: "Module loaded successfully",
+                unload_failed: "Unload failed: ",
+                reload_failed: "Reload failed: ",
+                load_failed: "Load failed: ",
+                get_api_failed: "Failed to get API info",
+                not_admin: "You are not an admin, cannot manage modules",
+                unknown_error: "Unknown error",
+                logout_confirm: "Are you sure to logout?"
+            }
+        };
+
+        let currentLang = localStorage.getItem('app_lang') || 'zh';
+        function t(key, params = {}) {
+            let text = i18n[currentLang][key] || key;
+            for (const [k, v] of Object.entries(params)) {
+                text = text.replace(`{${k}}`, v);
+            }
+            return text;
+        }
+
+        function updatePageTexts() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    el.placeholder = t(key);
+                } else if (el.tagName === 'OPTION') {
+                    el.textContent = t(key);
+                } else {
+                    el.textContent = t(key);
+                }
+            });
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('app_lang', lang);
+            document.getElementById('langSwitcher').value = lang;
+            updatePageTexts();
+            // 重新渲染表格以更新按钮文字
+            applyFilter();
+        }
+
+        // 语言切换监听
+        document.getElementById('langSwitcher').addEventListener('change', (e) => {
+            setLanguage(e.target.value);
+        });
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/web/login.html';
+        }
+
+        let allModules = [];
+
+        // 显示用户名
+        fetch('/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => res.json())
+        .then(user => {
+            document.getElementById('username').innerText = user.username;
+            if (user.role !== 'admin') {
+                alert(t('not_admin'));
+                window.location.href = '/web/dashboard.html';
+            }
+        })
+        .catch(() => {
+            localStorage.removeItem('token');
+            window.location.href = '/web/login.html';
+        });
+
+        async function loadModules() {
+            try {
+                const res = await fetch('/api/modules/manifest', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load manifest');
+                allModules = await res.json();
+                applyFilter();
+            } catch (err) {
+                console.error(err);
+                alert('加载模块列表失败');
+            }
+        }
+
+        function applyFilter() {
+            const filter = document.getElementById('statusFilter').value;
+            let filtered = allModules;
+            if (filter === 'loaded') {
+                filtered = allModules.filter(m => m.loaded === true);
+            } else if (filter === 'unloaded') {
+                filtered = allModules.filter(m => m.loaded === false);
+            }
+            renderTable(filtered);
+        }
+
+        function renderTable(modules) {
+            const tbody = document.querySelector('#modules-table tbody');
+            tbody.innerHTML = '';
+            modules.forEach(mod => {
+                const tr = document.createElement('tr');
+                const loaded = mod.loaded === true;
+                const statusClass = loaded ? 'status-loaded' : 'status-unloaded';
+                const statusText = loaded ? (currentLang === 'zh' ? '已加载' : 'Loaded') : (currentLang === 'zh' ? '未加载' : 'Unloaded');
+                tr.innerHTML = `
+                    <td>${escapeHtml(mod.id)}</td>
+                    <td>${escapeHtml(mod.path)}</td>
+                    <td>${escapeHtml(mod.api_prefix || '')}</td>
+                    <td><span class="module-status ${statusClass}">${statusText}</span></td>
+                    <td class="module-actions">
+                        ${loaded ? `
+                            <button class="btn btn-sm btn-danger" data-id="${mod.id}" data-action="unload">${t('unload_btn')}</button>
+                            <button class="btn btn-sm" data-id="${mod.id}" data-action="reload">${t('reload_btn')}</button>
+                        ` : `
+                            <button class="btn btn-sm btn-primary" data-id="${mod.id}" data-action="load">${t('load_btn_short')}</button>
+                        `}
+                        <button class="btn btn-sm" data-id="${mod.id}" data-action="api">${t('view_api_btn')}</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            // 绑定事件
+            document.querySelectorAll('[data-action="unload"]').forEach(btn => {
+                btn.addEventListener('click', () => unloadModule(btn.dataset.id));
+            });
+            document.querySelectorAll('[data-action="reload"]').forEach(btn => {
+                btn.addEventListener('click', () => reloadModule(btn.dataset.id));
+            });
+            document.querySelectorAll('[data-action="load"]').forEach(btn => {
+                btn.addEventListener('click', () => loadFromManifest(btn.dataset.id));
+            });
+            document.querySelectorAll('[data-action="api"]').forEach(btn => {
+                btn.addEventListener('click', () => viewApi(btn.dataset.id));
+            });
+        }
+
+        async function unloadModule(moduleId) {
+            if (!confirm(t('unload_confirm', { id: moduleId }))) return;
+            const res = await fetch(`/api/modules/unload?module_id=${moduleId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                alert(t('unload_success'));
+                loadModules();
+            } else {
+                const err = await res.json();
+                alert(t('unload_failed') + (err.detail || t('unknown_error')));
+            }
+        }
+
+        async function reloadModule(moduleId) {
+            if (!confirm(t('reload_confirm', { id: moduleId }))) return;
+            const res = await fetch(`/api/modules/reload?module_id=${moduleId}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                alert(t('reload_success'));
+                loadModules();
+            } else {
+                const err = await res.json();
+                alert(t('reload_failed') + (err.detail || t('unknown_error')));
+            }
+        }
+
+        async function loadFromManifest(moduleId) {
+            if (!confirm(t('load_confirm', { id: moduleId }))) return;
+            const res = await fetch('/api/modules/load_from_manifest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ module_id: moduleId })
+            });
+            if (res.ok) {
+                alert(t('load_success'));
+                loadModules();
+            } else {
+                const err = await res.json();
+                alert(t('load_failed') + (err.detail || t('unknown_error')));
+            }
+        }
+
+        async function viewApi(moduleId) {
+            try {
+                const res = await fetch(`/api/modules/${moduleId}/endpoints`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                document.getElementById('api-detail').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('api-modal').style.display = 'flex';
+            } catch (err) {
+                alert(t('get_api_failed'));
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        document.getElementById('load-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const module_path = document.getElementById('module-path').value;
+            const module_id = document.getElementById('module-id').value;
+            const api_prefix = document.getElementById('api-prefix').value;
+            const payload = { module_path };
+            if (module_id) payload.module_id = module_id;
+            if (api_prefix) payload.api_prefix = api_prefix;
+            const res = await fetch('/api/modules/load', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                alert(t('load_success'));
+                document.getElementById('load-form').reset();
+                loadModules();
+            } else {
+                const err = await res.json();
+                alert(t('load_failed') + (err.detail || t('unknown_error')));
+            }
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', applyFilter);
+        document.getElementById('refreshBtn').addEventListener('click', loadModules);
+
+        // 模态框关闭
+        document.querySelector('#api-modal .close').addEventListener('click', () => {
+            document.getElementById('api-modal').style.display = 'none';
+        });
+        window.onclick = (event) => {
+            if (event.target === document.getElementById('api-modal')) {
+                document.getElementById('api-modal').style.display = 'none';
+            }
+        };
+
+        // 退出登录
+        document.getElementById('logout').addEventListener('click', () => {
+            if (confirm(t('logout_confirm'))) {
+                localStorage.removeItem('token');
+                window.location.href = '/web/login.html';
+            }
+        });
+
+        // 初始化
+        setLanguage(currentLang);
+        loadModules();
+    </script>
+</body>
+</html>

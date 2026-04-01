@@ -1,0 +1,16 @@
+external_root: "../"
+conf_dir: "conf"
+mod_dir: "mod"
+web_dir: "web"
+log_dir: "log"
+web_url_prefix: "/webapps"
+allowed_extensions: [".html", ".htm"]
+jwt_secret_key: "your-secret-key-change-in-production"
+jwt_algorithm: "HS256"
+token_expire_minutes: 480
+module_auto_load: true
+module_allowed_paths:
+  - "../mod"
+log_level: "INFO"
+log_max_bytes: 10485760
+log_backup_count: 5

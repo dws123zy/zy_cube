@@ -1,0 +1,12 @@
+{
+  "modules": [
+    {
+      "id": "demo_module",
+      "path": "../mod/demo_module",
+      "enabled": true,
+      "auto_load": true,
+      "description": "示例模块",
+      "api_prefix": "/api/demo"
+    }
+  ]
+}

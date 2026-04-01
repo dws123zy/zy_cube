@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工作台 - ZY_Cube</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* 确保文件树容器可见 */
+        .dashboard-layout {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+        .sidebar {
+            width: 320px;
+            background: #f8fafc;
+            overflow-y: auto;
+            padding: 12px;
+            border-right: 1px solid #e2e8f0;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        /* 文件树样式（与 ai_app.html 类似） */
+        .file-tree-container {
+            margin-top: 12px;
+        }
+        .tree {
+            font-size: 0.9rem;
+        }
+        /* 移除列表圆点 */
+        #file-tree ul,
+        #file-tree li {
+            list-style: none !important;
+            margin: 0;
+            padding-left: 0;
+        }
+        #file-tree ul {
+            padding-left: 24px;
+        }
+        .node-header {
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .node-header:hover {
+            background: #eef2ff;
+        }
+        .folder-icon, .file-icon {
+            font-size: 1.1rem;
+            width: 24px;
+            text-align: center;
+        }
+        .folder-name, .file-name {
+            font-weight: 500;
+            color: #1e293b;
+        }
+        .file-name {
+            font-weight: normal;
+        }
+        .folder-children {
+            margin-left: 8px;
+        }
+        .empty-folder {
+            color: #94a3b8;
+            font-style: italic;
+            padding: 4px 0 4px 28px;
+            font-size: 0.8rem;
+        }
+        /* 标签页样式 */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            background: white;
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 8px 16px;
+            background: #f1f5f9;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            margin-right: 2px;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tab.active {
+            background: white;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+        }
+        .tab-content {
+            flex: 1;
+            background: white;
+            position: relative;
+        }
+        .tab-pane {
+            display: none;
+            width: 100%;
+            height: 100%;
+        }
+        .tab-pane.active {
+            display: block;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #2c3e50;
+            color: white;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .logout-btn {
+            background: #e74c3c;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .loading {
+            text-align: center;
+            color: #5e7a93;
+            padding: 20px;
+        }
+        /* 刷新按钮样式 */
+        .refresh-tree-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0 5px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .refresh-tree-btn:hover {
+            background: #e2e8f0;
+        }
+        .sidebar h3 {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 0 10px 0;
+        }
+        /* 语言切换器样式 */
+        .lang-selector {
+            background: #34495e;
+            border: 1px solid #5d6e7e;
+            color: white;
+            padding: 5px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .lang-selector option {
+            background: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1 data-i18n="app_title">AI APP 工作台</h1>
+    <div class="user-info">
+        <span id="username"></span>
+        <select id="langSwitcher" class="lang-selector">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+        </select>
+        <button class="logout-btn" id="logout" data-i18n="logout_btn">退出</button>
+    </div>
+</div>
+
+<div class="dashboard-layout">
+    <div class="sidebar">
+        <h3>
+            <span data-i18n="sidebar_title">📁 智能应用</span>
+            <button id="refreshFileTreeBtn" class="refresh-tree-btn" title="刷新文件树">⟳</button>
+        </h3>
+        <div id="file-tree" class="file-tree-container">
+            <div class="loading" data-i18n="loading">加载中...</div>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="tabs" id="tabs-container"></div>
+        <div class="tab-content" id="tab-content"></div>
+    </div>
+</div>
+
+<script>
+    // ==================== 国际化资源 ====================
+    const i18n = {
+        zh: {
+            app_title: "AI APP 工作台",
+            logout_btn: "退出",
+            sidebar_title: "📁 智能应用",
+            refresh_title: "刷新文件树",
+            loading: "加载中...",
+            loading_tree: "⏳ 加载文件树...",
+            load_failed: "❌ 加载失败: ",
+            empty_folder: "📂 空文件夹",
+            current_folder_empty: "📂 当前文件夹为空",
+            only_html_preview: "当前仅支持预览 .html 文件",
+            error_prefix: "加载失败: ",
+            tree_load_error: "根节点不是目录",
+            confirm_logout: "确定要退出登录吗？"
+        },
+        en: {
+            app_title: "AI APP Dashboard",
+            logout_btn: "Logout",
+            sidebar_title: "📁 Smart Apps",
+            refresh_title: "Refresh file tree",
+            loading: "Loading...",
+            loading_tree: "⏳ Loading file tree...",
+            load_failed: "❌ Load failed: ",
+            empty_folder: "📂 Empty folder",
+            current_folder_empty: "📂 Current folder is empty",
+            only_html_preview: "Only .html files can be previewed currently",
+            error_prefix: "Load failed: ",
+            tree_load_error: "Root is not a directory",
+            confirm_logout: "Are you sure you want to logout?"
+        }
+    };
+
+    let currentLang = localStorage.getItem('app_lang') || 'zh';
+    // 切换语言函数
+    function setLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem('app_lang', lang);
+        document.getElementById('langSwitcher').value = lang;
+        updatePageTexts();
+        // 重新加载文件树以更新动态文本（空文件夹提示等）
+        loadFileTree();
+    }
+
+    // 更新静态文本 (data-i18n)
+    function updatePageTexts() {
+        const elements = document.querySelectorAll('[data-i18n]');
+        elements.forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (i18n[currentLang][key]) {
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    el.placeholder = i18n[currentLang][key];
+                } else {
+                    el.innerText = i18n[currentLang][key];
+                }
+            }
+        });
+        // 刷新按钮的title
+        const refreshBtn = document.getElementById('refreshFileTreeBtn');
+        if (refreshBtn) refreshBtn.title = i18n[currentLang].refresh_title;
+        // 如果有动态生成的空文件夹文本，会在重新渲染树时处理，这里不重复
+    }
+
+    // 获取翻译文本
+    function t(key) {
+        return i18n[currentLang][key] || key;
+    }
+
+    const DEBUG = true;
+    function log(...args) {
+        if (DEBUG) console.log(...args);
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/web/login.html';
+    }
+
+    // 获取用户信息
+    fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(user => {
+        document.getElementById('username').innerText = user.username;
+        log('用户信息:', user);
+    })
+    .catch(err => {
+        console.error('获取用户信息失败:', err);
+        localStorage.removeItem('token');
+        window.location.href = '/web/login.html';
+    });
+
+    // 标签页管理
+    let tabs = [];
+    let activeTabId = null;
+
+    function openTab(title, path) {
+        const tabId = 'tab-' + Date.now() + '-' + Math.random().toString(36).substr(2, 8);
+        const iframeSrc = `/webapps/${path}?token=${token}`;
+        const tab = { id: tabId, title: title, path: path, iframeSrc: iframeSrc };
+        tabs.push(tab);
+        if (!activeTabId) activeTabId = tabId;
+        renderTabs();
+        setActiveTab(tabId);
+    }
+
+    function renderTabs() {
+        const tabsContainer = document.getElementById('tabs-container');
+        const tabContent = document.getElementById('tab-content');
+        tabsContainer.innerHTML = '';
+        tabContent.innerHTML = '';
+
+        tabs.forEach(tab => {
+            const tabBtn = document.createElement('div');
+            tabBtn.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+            tabBtn.textContent = tab.title;
+            tabBtn.onclick = () => setActiveTab(tab.id);
+            const closeBtn = document.createElement('span');
+            closeBtn.textContent = ' ×';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.onclick = (e) => { e.stopPropagation(); closeTab(tab.id); };
+            tabBtn.appendChild(closeBtn);
+            tabsContainer.appendChild(tabBtn);
+
+            const pane = document.createElement('div');
+            pane.className = 'tab-pane' + (tab.id === activeTabId ? ' active' : '');
+            pane.id = tab.id;
+            const iframe = document.createElement('iframe');
+            iframe.src = tab.iframeSrc;
+            iframe.onload = () => {
+                try {
+                    iframe.contentWindow.postMessage({ type: 'auth', token: token }, '*');
+                } catch(e) {}
+            };
+            pane.appendChild(iframe);
+            tabContent.appendChild(pane);
+        });
+    }
+
+    function setActiveTab(tabId) {
+        activeTabId = tabId;
+        document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+        const activeTab = tabs.find(t => t.id === tabId);
+        if (activeTab) {
+            const activeBtn = Array.from(document.querySelectorAll('.tab')).find(btn => btn.textContent.trim() === activeTab.title);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+        const activePane = document.getElementById(tabId);
+        if (activePane) activePane.classList.add('active');
+    }
+
+    function closeTab(tabId) {
+        const index = tabs.findIndex(t => t.id === tabId);
+        if (index !== -1) {
+            tabs.splice(index, 1);
+            if (activeTabId === tabId) {
+                activeTabId = tabs.length ? tabs[0].id : null;
+            }
+            renderTabs();
+            if (activeTabId) setActiveTab(activeTabId);
+        }
+    }
+
+    // 格式化文件大小
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // 格式化时间
+    function formatDate(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+
+    // 文件树渲染（支持国际化动态文本）
+    function buildTreeDom(items, currentPath = '') {
+        if (!items || items.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'empty-folder';
+            emptyDiv.textContent = t('current_folder_empty');
+            return emptyDiv;
+        }
+        const ul = document.createElement('ul');
+        for (const item of items) {
+            const li = document.createElement('li');
+            if (item.type === 'directory') {
+                // 文件夹节点
+                const header = document.createElement('div');
+                header.className = 'node-header folder';
+                const iconSpan = document.createElement('span');
+                iconSpan.className = 'folder-icon';
+                iconSpan.textContent = '📁';
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'folder-name';
+                nameSpan.textContent = item.name;
+                header.appendChild(iconSpan);
+                header.appendChild(nameSpan);
+
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'folder-children';
+                childrenContainer.style.display = 'none'; // 默认折叠
+                if (item.children && item.children.length) {
+                    const childDom = buildTreeDom(item.children, currentPath ? `${currentPath}/${item.name}` : item.name);
+                    childrenContainer.appendChild(childDom);
+                } else {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.className = 'empty-folder';
+                    emptyMsg.textContent = t('empty_folder');
+                    childrenContainer.appendChild(emptyMsg);
+                }
+
+                li.appendChild(header);
+                li.appendChild(childrenContainer);
+
+                header.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isHidden = childrenContainer.style.display === 'none';
+                    childrenContainer.style.display = isHidden ? 'block' : 'none';
+                    iconSpan.textContent = isHidden ? '📂' : '📁';
+                });
+            } else {
+                // 文件节点
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'node-header file';
+                const iconSpan = document.createElement('span');
+                iconSpan.className = 'file-icon';
+                iconSpan.textContent = '📄';
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'file-name';
+                nameSpan.textContent = item.name;
+                fileDiv.appendChild(iconSpan);
+                fileDiv.appendChild(nameSpan);
+
+                // 构建元数据字符串用于悬停提示
+                let tooltip = '';
+                if (item.size !== undefined) {
+                    tooltip += `大小: ${formatBytes(item.size)}`;
+                }
+                if (item.modified) {
+                    if (tooltip) tooltip += ' | ';
+                    tooltip += `修改时间: ${formatDate(item.modified)}`;
+                }
+                if (tooltip) {
+                    fileDiv.title = tooltip;
+                }
+
+                fileDiv.style.cursor = 'pointer';
+                let relativePath = currentPath ? `${currentPath}/${item.name}` : item.name;
+                relativePath = relativePath.replace(/\\/g, '/');
+                fileDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (item.name.endsWith('.html') && item.allowed !== false) {
+                        openTab(item.name, relativePath);
+                    } else {
+                        alert(t('only_html_preview'));
+                    }
+                });
+                li.appendChild(fileDiv);
+            }
+            ul.appendChild(li);
+        }
+        return ul;
+    }
+
+    // 加载文件树
+    async function loadFileTree() {
+        const container = document.getElementById('file-tree');
+        container.innerHTML = `<div class="loading">${t('loading_tree')}</div>`;
+        try {
+            const res = await fetch('/api/files/tree?root=web', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            log('文件树数据:', data);
+            if (data.type === 'directory') {
+                const domTree = buildTreeDom(data.children, '');
+                container.innerHTML = '';
+                container.appendChild(domTree);
+            } else {
+                throw new Error(t('tree_load_error'));
+            }
+        } catch (err) {
+            console.error('加载文件树失败:', err);
+            container.innerHTML = `<div class="error">${t('load_failed')}${err.message}</div>`;
+        }
+    }
+
+    // 退出登录
+    document.getElementById('logout').addEventListener('click', () => {
+        if (confirm(t('confirm_logout'))) {
+            localStorage.removeItem('token');
+            window.location.href = '/web/login.html';
+        }
+    });
+
+    // 刷新文件树按钮
+    document.getElementById('refreshFileTreeBtn').addEventListener('click', () => {
+        loadFileTree();
+    });
+
+    // 处理 URL 中的 token
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+        localStorage.setItem('token', urlToken);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        log('从 URL 获取 token');
+    }
+
+    // 语言切换监听
+    const langSwitcher = document.getElementById('langSwitcher');
+    langSwitcher.value = currentLang;
+    langSwitcher.addEventListener('change', (e) => {
+        setLanguage(e.target.value);
+    });
+
+    // 初始化页面文本和树
+    updatePageTexts();
+    loadFileTree();
+</script>
+</body>
+</html>
