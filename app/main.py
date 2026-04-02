@@ -13,6 +13,7 @@ from .core.logger import setup_logging
 from .core.loader import ModuleLoader
 from .api import auth, modules, files, module_metadata
 from .core.dependencies import get_current_user_from_token
+from app.api import sql_executor  # 导入 SQL 执行器路由
 
 # 初始化日志
 setup_logging()
@@ -44,6 +45,7 @@ app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(modules.router, prefix="/api", tags=["modules"])
 app.include_router(files.router, prefix="/api", tags=["files"])
 app.include_router(module_metadata.router, prefix="/api", tags=["module_metadata"])
+app.include_router(sql_executor.router, prefix="/api", tags=["sql"])
 
 # 内部 Web 目录（框架自带页面）
 internal_web_dir = Path(__file__).parent / "web"
