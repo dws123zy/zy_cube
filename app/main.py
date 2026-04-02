@@ -14,9 +14,14 @@ from .core.loader import ModuleLoader
 from .api import auth, modules, files, module_metadata
 from .core.dependencies import get_current_user_from_token
 from app.api import sql_executor  # 导入 SQL 执行器路由
+from app.api import user_manager
 
 # 初始化日志
 setup_logging()
+
+import logging
+logger = logging.getLogger(__name__)
+
 
 # 加载配置（如果尚未加载）
 config.load()
@@ -46,6 +51,7 @@ app.include_router(modules.router, prefix="/api", tags=["modules"])
 app.include_router(files.router, prefix="/api", tags=["files"])
 app.include_router(module_metadata.router, prefix="/api", tags=["module_metadata"])
 app.include_router(sql_executor.router, prefix="/api", tags=["sql"])
+app.include_router(user_manager.router, prefix="/api", tags=["user_management"])
 
 # 内部 Web 目录（框架自带页面）
 internal_web_dir = Path(__file__).parent / "web"
@@ -91,3 +97,4 @@ app.state.loader = loader
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+    logger.warning("欢迎使用卓越魔方平台")

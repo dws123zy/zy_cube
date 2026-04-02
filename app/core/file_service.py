@@ -4,9 +4,13 @@
 import os
 import stat
 from pathlib import Path
+import traceback
 from datetime import datetime
 from typing import Dict, List, Union, Optional
 from .config import config
+
+import logging
+logger = logging.getLogger(__name__)
 
 # 允许的扩展名
 ALLOWED_EXTENSIONS = config.get("allowed_extensions", [".html", ".htm"])
@@ -21,6 +25,8 @@ def is_safe_path(base_dir: Path, target_path: str) -> bool:
         # 确保 resolved_target 在 resolved_base 下
         return resolved_target.is_relative_to(resolved_base)
     except Exception:
+        logger.error(f"Error resolving path: {target_path}")
+        logger.error(traceback.format_exc())
         return False
 
 def get_file_tree(root_path: Path, rel_path: str = "") -> Dict:
@@ -96,4 +102,6 @@ def read_file_content(root_path: Path, rel_path: str) -> Optional[str]:
         with open(full_path, 'r', encoding='utf-8') as f:
             return f.read()
     except Exception:
+        logger.error(f"Error reading file: {full_path}")
+        logger.error(traceback.format_exc())
         return None

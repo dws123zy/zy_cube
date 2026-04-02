@@ -5,6 +5,7 @@ description = "ZY_Cube 卓越魔方 - 动态可扩展的AI开发平台"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "bcrypt>=5.0.0",
     "duckdb>=1.5.1",
     "duckdb-engine>=0.17.0",
     "fastapi>=0.135.2",

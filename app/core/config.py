@@ -129,11 +129,6 @@ class Config:
         return self.external_root / self.get("log_dir")
     
     @property
-    def users_file(self) -> Path:
-        """用户配置文件路径"""
-        return self.conf_dir / "users.json"
-    
-    @property
     def modules_manifest_file(self) -> Path:
         """模块清单文件路径"""
         return self.conf_dir / "modules_manifest.json"

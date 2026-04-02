@@ -16,6 +16,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import config
 from app.core.dependencies import get_current_user_from_token
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # 创建 router
 router = APIRouter(prefix="/sql", tags=["sql"])
 

@@ -5,11 +5,16 @@ import sys
 import importlib
 import importlib.util
 from pathlib import Path
+import traceback
 from typing import Dict, List, Optional, Any
 from fastapi import FastAPI, APIRouter
 from fastapi.routing import APIRoute
 import json
 from .config import config
+
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ModuleInfo:
     def __init__(self, id: str, path: str, api_prefix: str, router: APIRouter, routes_list: List):
@@ -27,12 +32,6 @@ class ModuleLoader:
         self.manifest = []  # 公开属性
         self._manifest_path = config.modules_manifest_file
         self._load_manifest()
-    # def __init__(self, app: FastAPI):
-    #     self.app = app
-    #     self.allowed_paths = [Path(p).resolve() for p in config.get("module_allowed_paths", [])]
-    #     self.loaded_modules: Dict[str, ModuleInfo] = {}
-    #     self._manifest_path = config.modules_manifest_file
-    #     self._load_manifest()
 
     def _load_manifest(self):
         """加载 manifest 文件，获取需要自动加载的模块"""
@@ -63,6 +62,7 @@ class ModuleLoader:
                     return True
             return False
         except Exception:
+            logger.error(f"Error resolving path: {module_path}")
             return False
 
     def load_module(self, module_path: str, module_id: str = None, api_prefix: str = None) -> ModuleInfo:
@@ -78,6 +78,12 @@ class ModuleLoader:
             raise ValueError(f"Module path does not exist: {module_path}")
         if not self._is_safe_path(path_obj):
             raise ValueError(f"Module path not allowed: {module_path}")
+
+        # 在 load_module 开头添加
+        for loaded in self.loaded_modules.values():
+            other_prefix = loaded.api_prefix
+            if (api_prefix.startswith(other_prefix + '/') or other_prefix.startswith(api_prefix + '/')):
+                raise ValueError(f"API prefix conflict: '{api_prefix}' conflicts with '{other_prefix}'")
 
         # 确定 module_id
         if module_id is None:
@@ -145,30 +151,22 @@ class ModuleLoader:
         return info
 
     def unload_module(self, module_id: str) -> bool:
-        """卸载模块（从应用中移除路由）"""
         if module_id not in self.loaded_modules:
             return False
         info = self.loaded_modules[module_id]
+        prefix = info.api_prefix
 
-        # 获取当前所有路由
-        current_routes = list(self.app.router.routes)
-        # 收集该模块的所有 endpoint 函数
-        module_routes = set()
-        for route in info.router.routes:
-            # 只有 APIRoute 类型的路由才有 endpoint
-            if hasattr(route, 'endpoint'):
-                module_routes.add(route.endpoint)
-
-        # 保留不属于该模块的路由，以及非 APIRoute 的路由（如 Mount）
+        # 过滤路由：保留所有不以 prefix 开头的路由（严格匹配）
         new_routes = []
-        for r in current_routes:
-            # 如果是 APIRoute 并且 endpoint 在 module_routes 中，则跳过（移除）
-            if hasattr(r, 'endpoint') and r.endpoint in module_routes:
-                continue
-            # 否则保留
-            new_routes.append(r)
+        for route in self.app.router.routes:
+            # 仅处理具有 path 属性的路由（APIRoute, Mount 等）
+            path = getattr(route, 'path', None)
+            if path is not None:
+                # 精确匹配 prefix 或以 prefix/ 开头
+                if path == prefix or path.startswith(prefix + '/'):
+                    continue
+            new_routes.append(route)
 
-        # 替换私有路由列表
         self.app.router.routes = new_routes
 
         # 从 sys.modules 中删除模块
@@ -184,7 +182,6 @@ class ModuleLoader:
                 m["enabled"] = False
                 break
         self._save_manifest()
-
         return True
 
     def reload_module(self, module_id: str) -> ModuleInfo:
@@ -303,4 +300,4 @@ class ModuleLoader:
                     self.load_module(mod["path"], mod["id"], mod.get("api_prefix"))
                 except Exception as e:
                     # 记录日志但继续
-                    print(f"Failed to auto-load module {mod['id']}: {e}")
+                    logger.error(f"Failed to auto-load module {mod['id']}: {e}")
