@@ -54,9 +54,14 @@ uv sync
 
 #### 4. 启动服务
 ```bash
-uv run uvicorn app.main:app --reload
+# 进入虚拟环境
+source .venv/bin/activate
+
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+# 或者
+screen uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
-服务默认运行在 http://localhost:8000。
+服务默认运行在 http://localhost:8080。
 
 #### 5. 登录
 如果 ../conf/users.json 不存在，使用默认管理员账号：admin / admin

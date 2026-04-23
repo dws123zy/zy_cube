@@ -48,11 +48,11 @@ class Config:
         
         default_config = {
             "external_root": "../",
-            "conf_dir": "../conf",
-            "mod_dir": "../mod",
-            "web_dir": "../web",
-            "web_lib": "../weblib",
-            "log_dir": "../log",
+            "conf_dir": "conf",
+            "mod_dir": "mod",
+            "web_dir": "web",
+            "web_lib": "weblib",
+            "log_dir": "log",
             "web_url_prefix": "/webapps",
             "allowed_extensions": [".html", ".htm"],
             "jwt_secret_key": "your-secret-key-change-in-production",

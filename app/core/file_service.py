@@ -37,6 +37,7 @@ def get_file_tree(root_path: Path, rel_path: str = "") -> Dict:
     :return: 树节点字典
     """
     full_path = root_path / rel_path
+    logger.warning(f"本次工作的路径: {full_path}")
     if not full_path.exists():
         return {"error": "Path does not exist"}
 
