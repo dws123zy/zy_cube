@@ -73,6 +73,12 @@ external_web_dir = config.web_dir
 external_web_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/webapps", StaticFiles(directory=external_web_dir), name="webapps")
 
+# 外部公共库目录（用于存放 Vue、ECharts 等 JS 库）
+weblib_dir = config.external_root / "weblib"
+weblib_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/weblib", StaticFiles(directory=weblib_dir), name="weblib")
+logger.info(f"Weblib directory: {weblib_dir} mounted at /weblib")
+
 # 根路径重定向
 @app.get("/", include_in_schema=False)
 async def root():
